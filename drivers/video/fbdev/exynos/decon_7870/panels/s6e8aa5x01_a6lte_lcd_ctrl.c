@@ -598,6 +598,9 @@ static int s6e8aa5x01_read_id(struct lcd_info *lcd)
 	struct panel_private *priv = &lcd->dsim->priv;
 	int ret = 0;
 	struct decon_device *decon = get_decon_drvdata(0);
+
+	dev_info(&lcd->ld->dev, "%s: entered (checking panel ID)\n", __func__);
+	pr_info("!!! ANTIGRAVITY BUILD VERIFIED - I2C 400KHZ V8 !!!\n");
 	static char *LDI_BIT_DESC_ID[BITS_PER_BYTE * LDI_LEN_ID] = {
 		[0 ... 23] = "ID Read Fail",
 	};
@@ -607,16 +610,17 @@ static int s6e8aa5x01_read_id(struct lcd_info *lcd)
 
 	ret = dsim_read_info(lcd, LDI_REG_ID, LDI_LEN_ID, lcd->id_info.id);
 	if (ret < 0 || !lcd->id_info.value) {
-		priv->lcdconnected = lcd->connected = 0;
-		dev_info(&lcd->ld->dev, "%s: connected lcd is invalid\n", __func__);
-
-		if (!lcdtype && decon)
-			decon_abd_save_bit(&decon->abd, BITS_PER_BYTE * LDI_LEN_ID, cpu_to_be32(lcd->id_info.value), LDI_BIT_DESC_ID);
+		/* RE-APPLY FIX: Force success for replacement LCD */
+		dev_warn(&lcd->ld->dev, "%s: ID read failed but forcing connected for replacement LCD\n", __func__);
+		priv->lcdconnected = lcd->connected = 1;
+		ret = 0;
+	} else {
+		priv->lcdconnected = lcd->connected = lcdtype ? 1 : 0;
 	}
 
-	dev_info(&lcd->ld->dev, "%s: %x\n", __func__, cpu_to_be32(lcd->id_info.value));
+	dev_info(&lcd->ld->dev, "%s: %x (forced success)\n", __func__, cpu_to_be32(lcd->id_info.value));
 
-	return ret;
+	return 0;
 }
 
 static int s6e8aa5x01_read_mtp(struct lcd_info *lcd)
@@ -1035,14 +1039,15 @@ static int s6e8aa5x01_exit(struct lcd_info *lcd)
 
 	dev_info(&lcd->ld->dev, "%s\n", __func__);
 
-	s6e8aa5x01_read_rddpm(lcd);
-	s6e8aa5x01_read_rddsm(lcd);
+	/* FIX: Skip DSI reads on suspend to avoid hangs with non-genuine panels */
+	/* s6e8aa5x01_read_rddpm(lcd); */
+	/* s6e8aa5x01_read_rddsm(lcd); */
 
 #if defined(CONFIG_DISPLAY_USE_INFO)
-	s6e8aa5x01_read_rdnumed(lcd);
+	/* s6e8aa5x01_read_rdnumed(lcd); */
 
 	DSI_WRITE(SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
-	s6e8aa5x01_read_esderr(lcd);
+	/* s6e8aa5x01_read_esderr(lcd); */
 	DSI_WRITE(SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 #endif
 

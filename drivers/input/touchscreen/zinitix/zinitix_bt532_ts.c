@@ -1316,7 +1316,8 @@ static bool bt532_power_control(struct bt532_ts_info *info, u8 ctl)
 	bt532_pinctrl_configure(info, ctl);
 
 	if (ctl == POWER_ON_SEQUENCE) {
-		msleep(CHIP_ON_DELAY);
+		pr_info("[TSP_DEBUG] bt532_power_control: Force delay 600ms for global safety\n");
+		msleep(600);
 		return bt532_power_sequence(info);
 	}
 	else if (ctl == POWER_OFF) {
@@ -2463,7 +2464,11 @@ static void bt532_ts_late_resume(struct early_suspend *h)
 	write_cmd(info->client, BT532_WAKEUP_CMD);
 	usleep_range(1 * 1000, 1 * 1000);
 #else
-	bt532_power_control(info, POWER_ON_SEQUENCE);
+	/* REPLACED FIX: Use POWER_ON instead of POWER_ON_SEQUENCE to avoid early I2C traffic */
+	pr_info("[TSP_DEBUG] bt532_ts_late_resume: Calling POWER_ON\n");
+	bt532_power_control(info, POWER_ON);
+	pr_info("[TSP_DEBUG] bt532_ts_late_resume: Waiting 600ms for chip wakeup (Extended)\n");
+	msleep(600); 
 #endif
 	if (!crc_check(info))
 		goto fail_late_resume;
@@ -2555,7 +2560,11 @@ static int bt532_ts_resume(struct device *dev)
 		return 0;
 	}
 
-	bt532_power_control(info, POWER_ON_SEQUENCE);
+	/* REPLACED FIX: Use POWER_ON instead of POWER_ON_SEQUENCE to avoid early I2C traffic */
+	pr_info("[TSP_DEBUG] bt532_ts_resume: Calling POWER_ON\n");
+	bt532_power_control(info, POWER_ON);
+	pr_info("[TSP_DEBUG] bt532_ts_resume: Waiting 600ms for chip wakeup\n");
+	msleep(600);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->work_state = RESUME;
@@ -5591,7 +5600,14 @@ static int bt532_ts_probe(struct i2c_client *client,
 	info->work_state = PROBE;
 
 	// power on
-	if (bt532_power_control(info, POWER_ON_SEQUENCE) == false) {
+	/* REPLACED: Split POWER_ON_SEQUENCE to POWER_ON + DELAY + SEQUENCE to fix boot I2C hang */
+	pr_info("[TSP_DEBUG] Probe: Starting Safe Power On Sequence\n");
+	bt532_power_control(info, POWER_ON);
+	pr_info("[TSP_DEBUG] Probe: Waiting 600ms for stable power/reset\n");
+	msleep(600);
+
+	if (bt532_power_sequence(info) == false) {
+		pr_err("[TSP_DEBUG] Probe: bt532_power_sequence failed\n");
 		ret = -EPERM;
 		goto err_power_sequence;
 	}
@@ -5944,3 +5960,9 @@ module_exit(bt532_ts_exit);
 MODULE_DESCRIPTION("touch-screen device driver using i2c interface");
 MODULE_AUTHOR("<mika.kim@samsung.com>");
 MODULE_LICENSE("GPL");
+
+void trustedui_mode_on(void) {}
+EXPORT_SYMBOL(trustedui_mode_on);
+
+void trustedui_mode_off(void) {}
+EXPORT_SYMBOL(trustedui_mode_off);

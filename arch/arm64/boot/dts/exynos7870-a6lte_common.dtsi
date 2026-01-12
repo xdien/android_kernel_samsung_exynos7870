@@ -544,7 +544,7 @@
 	};
 
 	hall {
-		status = "okay";
+		status = "disabled";
 		compatible = "hall";
 		pinctrl-names = "default";
 		pinctrl-0 = <&hall_irq>;

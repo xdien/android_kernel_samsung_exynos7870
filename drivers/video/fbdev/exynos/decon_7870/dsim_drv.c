@@ -487,13 +487,13 @@ int dsim_read_data(struct dsim_device *dsim, u32 data_id,
 			break;
 		case MIPI_DSI_RX_DCS_LONG_READ_RESPONSE:
 		case MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE:
-			dev_dbg(dsim->dev, "Long Packet was received from LCD module.\n");
+			dev_info(dsim->dev, "Long Packet was received from LCD module.\n");
 			rx_size = (rx_fifo & 0x00ffff00) >> 8;
-			dev_dbg(dsim->dev, "rx fifo : %8x, response : %x, rx_size : %d\n",
+			dev_info(dsim->dev, "rx fifo : %8x, response : %x, rx_size : %d\n",
 					rx_fifo, rx_fifo & 0xff, rx_size);
 			if (rx_size > count) {
-				dev_err(dsim->dev, "rx size is invalid, rx_size: %d, count: %d\n", rx_size, count);
-				rx_size = count;
+				dev_warn(dsim->dev, "rx size is invalid, rx_size: %d, count: %d (clamping)\n", rx_size, count);
+				rx_size = count; /* Fix buffer overflow */
 			}
 			/* Read data from RX packet payload */
 			for (i = 0; i < rx_size >> 2; i++) {
